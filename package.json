@@ -1,0 +1,29 @@
+{
+  "name": "@manifestdocs/mcp",
+  "version": "0.1.0",
+  "description": "Manifest MCP server for Claude Code and Cursor",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "manifest-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

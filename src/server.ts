@@ -1,0 +1,432 @@
+/**
+ * Manifest MCP Server
+ *
+ * Registers 26 tools with zod schemas, delegates to pure handler functions.
+ */
+
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { ManifestClient, type ManifestClientConfig } from './client.js';
+import {
+  handleListProjects,
+  handleFindFeatures,
+  handleGetFeature,
+
+  handleGetNextFeature,
+  handleRenderFeatureTree,
+  handleOrient,
+} from './tools/discovery.js';
+import {
+  handleStartFeature,
+  handleUpdateFeature,
+  handleProveFeature,
+  handleCompleteFeature,
+} from './tools/work.js';
+import {
+  handleInitProject,
+  handleAddProjectDirectory,
+  handleCreateFeature,
+  handleDeleteFeature,
+  handlePlan,
+  handleGetProjectInstructions,
+  handleGetProjectHistory,
+  handleGenerateFeatureTree,
+  handleSync,
+} from './tools/setup.js';
+import {
+  handleListVersions,
+  handleCreateVersion,
+  handleSetFeatureVersion,
+  handleReleaseVersion,
+} from './tools/versions.js';
+import {
+  handleVerifyFeature,
+  handleRecordVerification,
+  handleGetFeatureProof,
+} from './tools/verification.js';
+
+function textResult(text: string) {
+  return { content: [{ type: 'text' as const, text }] };
+}
+
+// ============================================================
+// Shared zod fragments
+// ============================================================
+
+const FeatureStateEnum = z.enum(['proposed', 'blocked', 'in_progress', 'implemented', 'archived']);
+const MutableFeatureStateEnum = z.enum(['proposed', 'blocked', 'in_progress', 'archived']);
+const TestStateEnum = z.enum(['passed', 'failed', 'errored', 'skipped']);
+const AgentTypeEnum = z.enum(['claude', 'gemini', 'codex', 'pi', 'copilot']);
+const SeverityEnum = z.enum(['critical', 'major', 'minor']);
+
+// Recursive type for plan features
+const ProposedFeatureSchema: z.ZodType<{
+  title: string;
+  details?: string;
+  priority: number;
+  state?: string;
+  children: any[];
+}> = z.lazy(() =>
+  z.object({
+    title: z.string().describe('Feature capability name'),
+    details: z.string().optional().describe('Spec or shared context'),
+    priority: z.number().describe('Priority (lower = first)'),
+    state: FeatureStateEnum.optional().describe("Initial state. Default 'proposed'."),
+    children: z.array(ProposedFeatureSchema),
+  }),
+);
+
+// ============================================================
+// createServer
+// ============================================================
+
+export function createServer(config?: ManifestClientConfig): McpServer {
+  const client = new ManifestClient(config);
+
+  const server = new McpServer({
+    name: 'manifest',
+    version: '0.1.0',
+  });
+
+  // ----------------------------------------------------------
+  // Discovery Tools (7)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'manifest_list_projects',
+    'List projects. If directory_path is provided, finds the project containing that directory.',
+    {
+      directory_path: z.string().optional().describe('Directory path to find the project for (auto-discovery)'),
+    },
+    async (params) => textResult(await handleListProjects(client, params)),
+  );
+
+  server.tool(
+    'manifest_find_features',
+    'Find features by project, state, or search query. Returns summaries only.',
+    {
+      project_id: z.string().optional().describe('Project UUID to filter by'),
+      version_id: z.string().optional().describe('Version UUID to filter by'),
+      state: FeatureStateEnum.optional().describe('State filter'),
+      query: z.string().optional().describe('Search query for title and details'),
+      limit: z.number().optional().describe('Max results to return'),
+      offset: z.number().optional().describe('Number to skip for pagination'),
+    },
+    async (params) => textResult(await handleFindFeatures(client, params)),
+  );
+
+  server.tool(
+    'manifest_get_feature',
+    "Get feature spec. Default 'card' view is a compact pre-formatted card. Use 'full' for breadcrumb context, siblings, and optional history.",
+    {
+      feature_id: z.string().describe('Feature UUID or display ID (e.g., MAN-42)'),
+      view: z.enum(['card', 'full']).optional().describe("View mode. 'card' (default) is a compact pre-formatted card. 'full' includes breadcrumb context, siblings, and optional history."),
+      include_history: z.boolean().optional().describe('Include implementation history (full view only). Default false.'),
+    },
+    async (params) => textResult(await handleGetFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_get_next_feature',
+    "Get the highest-priority workable feature. Use ONLY when the user says \"next feature\" or \"what's next\".",
+    {
+      project_id: z.string().optional().describe('Project UUID'),
+      directory_path: z.string().optional().describe('Directory path for auto-discovery (alternative to project_id)'),
+      version_id: z.string().optional().describe('Optional version UUID to filter by'),
+    },
+    async (params) => textResult(await handleGetNextFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_render_feature_tree',
+    'Render the feature tree as ASCII art with state symbols. Optionally filter by leaf state.',
+    {
+      project_id: z.string().optional().describe('Project UUID'),
+      directory_path: z.string().optional().describe('Directory path for auto-discovery (alternative to project_id)'),
+      max_depth: z.number().optional().describe('Max depth (0 = unlimited). Default 0.'),
+      state: FeatureStateEnum.optional().describe('Filter tree to branches containing leaves in this state'),
+    },
+    async (params) => textResult(await handleRenderFeatureTree(client, params)),
+  );
+
+  server.tool(
+    'manifest_orient',
+    'Session bootloader. Returns project overview: feature tree (depth 2), work queue, recent activity. Call at session start.',
+    {
+      project_id: z.string().optional().describe('Project UUID (optional if directory_path provided)'),
+      directory_path: z.string().optional().describe('Directory path to auto-discover project'),
+    },
+    async (params) => textResult(await handleOrient(client, params)),
+  );
+
+  // ----------------------------------------------------------
+  // Work Tools (4)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'manifest_start_feature',
+    'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      agent_type: AgentTypeEnum.optional().describe("Agent type. Defaults to 'claude'."),
+      force: z.boolean().optional().describe('Force start even if claimed. Default false.'),
+      claim_metadata: z.string().optional().describe('JSON metadata (branch, worktree, etc.)'),
+    },
+    async (params) => textResult(await handleStartFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_update_feature',
+    'Update any feature field: title, details, state, priority, parent, version.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      title: z.string().optional().describe('New title'),
+      details: z.string().optional().describe('New details/spec'),
+      desired_details: z.string().optional().describe('Proposed changes for human review'),
+      details_summary: z.string().optional().describe('Short summary for root features'),
+      state: MutableFeatureStateEnum.optional().describe('New state'),
+      priority: z.number().optional().describe('Priority (lower = first)'),
+      parent_id: z.string().optional().describe('Move to different parent UUID'),
+      target_version_id: z.string().optional().describe('Assign to version UUID'),
+      clear_version: z.boolean().optional().describe('Unassign from version'),
+      blocked_by: z.array(z.string()).optional().describe('Feature IDs that block this'),
+    },
+    async (params) => textResult(await handleUpdateFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_prove_feature',
+    'Record test evidence for a feature. Creates a proof with command, exit code, and structured results. IMPORTANT: Parse test output into individual test entries (one per test case). Use verbose flags (rspec --format documentation, pytest -v, go test -v) to get parseable output. Never collapse multiple tests into one entry.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      command: z.string().describe("Test command run (e.g., 'vitest run')"),
+      exit_code: z.number().describe('Process exit code (0 = pass)'),
+      output: z.string().optional().describe('Raw stdout/stderr (max 10K chars)'),
+      test_suites: z.array(z.object({
+        name: z.string().describe('Suite name'),
+        file: z.string().optional().describe('Source file path'),
+        tests: z.array(z.object({
+          name: z.string().describe('Test name'),
+          state: TestStateEnum.describe('Test result state'),
+          file: z.string().optional(),
+          line: z.number().optional(),
+          duration_ms: z.number().optional(),
+          message: z.string().optional(),
+        })),
+      })).optional().describe('Structured test results grouped by suite (preferred)'),
+      tests: z.array(z.object({
+        name: z.string().describe('Test name'),
+        suite: z.string().optional().describe('Suite name'),
+        state: TestStateEnum.describe('Test result state'),
+        file: z.string().optional(),
+        line: z.number().optional(),
+        duration_ms: z.number().optional(),
+        message: z.string().optional(),
+      })).optional().describe('Flat test results'),
+      evidence: z.array(z.object({
+        path: z.string().describe('File path'),
+        note: z.string().optional().describe('Why this is evidence'),
+      })).optional(),
+      commit_sha: z.string().optional().describe('Git commit SHA at time of proving'),
+    },
+    async (params) => textResult(await handleProveFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_complete_feature',
+    'Mark work as done. Records history with summary and commits, sets state to implemented.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      summary: z.string().describe('Work summary. First line = headline.'),
+      commits: z.array(z.union([
+        z.string(),
+        z.object({ sha: z.string(), message: z.string() }),
+      ])).describe('Git commit SHAs or {sha, message} objects'),
+      backfill: z.boolean().optional().describe('Skip proof/spec requirements. Default false.'),
+    },
+    async (params) => textResult(await handleCompleteFeature(client, params)),
+  );
+
+  // ----------------------------------------------------------
+  // Setup Tools (9)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'manifest_init_project',
+    'Initialize a project from a directory. Analyzes codebase, creates project, returns size signals.',
+    {
+      directory_path: z.string().describe('Absolute path to the project directory'),
+      skip_default_versions: z.boolean().optional().describe('Skip creating default versions. Default false.'),
+    },
+    async (params) => textResult(await handleInitProject(client, params)),
+  );
+
+  server.tool(
+    'manifest_add_project_directory',
+    'Associate an additional directory with a project (monorepo support).',
+    {
+      project_id: z.string().describe('Project UUID'),
+      path: z.string().describe('Absolute directory path'),
+      git_remote: z.string().optional().describe('Git remote URL'),
+      is_primary: z.boolean().optional().describe('Is primary directory. Default false.'),
+      instructions: z.string().optional().describe('Directory-specific instructions'),
+    },
+    async (params) => textResult(await handleAddProjectDirectory(client, params)),
+  );
+
+  server.tool(
+    'manifest_create_feature',
+    'Create a single feature. Check find_features for duplicates first.',
+    {
+      project_id: z.string().describe('Project UUID'),
+      parent_id: z.string().optional().describe('Parent feature UUID'),
+      title: z.string().describe('Short capability name (2-5 words)'),
+      details: z.string().optional().describe('Feature spec or shared context'),
+      state: FeatureStateEnum.optional().describe("Initial state. Default 'proposed'."),
+      priority: z.number().optional().describe('Priority (lower = first). Default 0.'),
+    },
+    async (params) => textResult(await handleCreateFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_delete_feature',
+    'Permanently delete a feature and descendants. Use only for archived features.',
+    {
+      feature_id: z.string().describe('Feature UUID'),
+    },
+    async (params) => textResult(await handleDeleteFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_decompose',
+    'Decompose a PRD or vision into a feature tree. Use confirm=false to preview, confirm=true to create.',
+    {
+      project_id: z.string().describe('Project UUID'),
+      features: z.array(ProposedFeatureSchema).describe('Proposed feature tree'),
+      confirm: z.boolean().describe('true to create, false to preview'),
+      target_version_id: z.string().optional().describe('Version UUID for all features'),
+    },
+    async (params) => textResult(await handlePlan(client, params)),
+  );
+
+  server.tool(
+    'manifest_get_project_instructions',
+    'Get full project instructions (coding guidelines, conventions).',
+    {
+      project_id: z.string().describe('Project UUID'),
+    },
+    async (params) => textResult(await handleGetProjectInstructions(client, params)),
+  );
+
+  server.tool(
+    'manifest_get_project_history',
+    'Get recent activity timeline. Display directly without reformatting.',
+    {
+      project_id: z.string().describe('Project UUID'),
+      feature_id: z.string().optional().describe('Filter to feature and descendants'),
+      limit: z.number().optional().describe('Max entries. Default 20.'),
+    },
+    async (params) => textResult(await handleGetProjectHistory(client, params)),
+  );
+
+  server.tool(
+    'manifest_generate_feature_tree',
+    'Analyze a codebase directory and generate a proposed feature tree from its structure.',
+    {
+      directory_path: z.string().describe('Absolute path to the project directory to analyze'),
+    },
+    async (params) => textResult(await handleGenerateFeatureTree(client, params)),
+  );
+
+  server.tool(
+    'manifest_sync',
+    'Reconcile the feature tree with git history. Returns sync proposals.',
+    {
+      project_id: z.string().describe('Project UUID'),
+    },
+    async (params) => textResult(await handleSync(client, params)),
+  );
+
+  // ----------------------------------------------------------
+  // Version Tools (4)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'manifest_list_versions',
+    'List versions with status indicators (next, planned, released).',
+    {
+      project_id: z.string().describe('Project UUID'),
+    },
+    async (params) => textResult(await handleListVersions(client, params)),
+  );
+
+  server.tool(
+    'manifest_create_version',
+    "Create a release milestone. Name must be semantic version (e.g., 0.2.0).",
+    {
+      project_id: z.string().describe('Project UUID'),
+      name: z.string().describe("Version name (e.g., '0.2.0')"),
+      description: z.string().optional().describe('Version description'),
+    },
+    async (params) => textResult(await handleCreateVersion(client, params)),
+  );
+
+  server.tool(
+    'manifest_set_feature_version',
+    'Assign a feature to a version. Pass null to unassign.',
+    {
+      feature_id: z.string().describe('Feature UUID'),
+      version_id: z.string().nullable().describe('Version UUID or null to unassign'),
+    },
+    async (params) => textResult(await handleSetFeatureVersion(client, params)),
+  );
+
+  server.tool(
+    'manifest_release_version',
+    'Mark a version as shipped.',
+    {
+      version_id: z.string().describe('Version UUID'),
+    },
+    async (params) => textResult(await handleReleaseVersion(client, params)),
+  );
+
+  // ----------------------------------------------------------
+  // Verification Tools (3)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'manifest_verify_feature',
+    'Assemble spec + diff for checking implementation against spec. You are the LLM.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      commit_range: z.string().optional().describe("Git commit range (e.g., 'abc123..HEAD')"),
+    },
+    async (params) => textResult(await handleVerifyFeature(client, params)),
+  );
+
+  server.tool(
+    'manifest_record_verification',
+    'Store verification comments. Pass empty array if implementation satisfies spec.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      comments: z.array(z.object({
+        severity: SeverityEnum.describe('Comment severity'),
+        title: z.string().describe('One-line summary of the gap'),
+        body: z.string().describe('Actionable explanation'),
+        file: z.string().optional().describe('Affected file path'),
+      })).describe('Verification comments (empty = passed)'),
+    },
+    async (params) => textResult(await handleRecordVerification(client, params)),
+  );
+
+  server.tool(
+    'manifest_get_feature_proof',
+    'Get latest proof and verification status for a feature.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+    },
+    async (params) => textResult(await handleGetFeatureProof(client, params)),
+  );
+
+  return server;
+}
