@@ -18,6 +18,7 @@ import {
 } from './tools/discovery.js';
 import {
   handleStartFeature,
+  handleAssessPlan,
   handleUpdateFeature,
   handleProveFeature,
   handleCompleteFeature,
@@ -28,7 +29,6 @@ import {
   handleCreateFeature,
   handleDeleteFeature,
   handlePlan,
-  handleGetProjectInstructions,
   handleGetProjectHistory,
   handleGenerateFeatureTree,
   handleSync,
@@ -44,6 +44,7 @@ import {
   handleRecordVerification,
   handleGetFeatureProof,
 } from './tools/verification.js';
+import type { ProposedFeature } from './types.js';
 
 function textResult(text: string) {
   return { content: [{ type: 'text' as const, text }] };
@@ -60,20 +61,14 @@ const AgentTypeEnum = z.enum(['claude', 'gemini', 'codex', 'pi', 'copilot']);
 const SeverityEnum = z.enum(['critical', 'major', 'minor']);
 
 // Recursive type for plan features
-const ProposedFeatureSchema: z.ZodType<{
-  title: string;
-  details?: string;
-  priority: number;
-  state?: string;
-  children: any[];
-}> = z.lazy(() =>
+const ProposedFeatureSchema: z.ZodType<ProposedFeature> = z.lazy(() =>
   z.object({
     title: z.string().describe('Feature capability name'),
     details: z.string().optional().describe('Spec or shared context'),
     priority: z.number().describe('Priority (lower = first)'),
     state: FeatureStateEnum.optional().describe("Initial state. Default 'proposed'."),
     children: z.array(ProposedFeatureSchema),
-  }),
+  }) as z.ZodType<ProposedFeature>,
 );
 
 // ============================================================
@@ -93,7 +88,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   // ----------------------------------------------------------
 
   server.tool(
-    'manifest_list_projects',
+    'list_projects',
     'List projects. If directory_path is provided, finds the project containing that directory.',
     {
       directory_path: z.string().optional().describe('Directory path to find the project for (auto-discovery)'),
@@ -102,7 +97,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_find_features',
+    'find_features',
     'Find features by project, state, or search query. Returns summaries only.',
     {
       project_id: z.string().optional().describe('Project UUID to filter by'),
@@ -116,7 +111,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_get_feature',
+    'get_feature',
     "Get feature spec. Default 'card' view is a compact pre-formatted card. Use 'full' for breadcrumb context, siblings, and optional history.",
     {
       feature_id: z.string().describe('Feature UUID or display ID (e.g., MAN-42)'),
@@ -127,7 +122,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_get_next_feature',
+    'get_next_feature',
     "Get the highest-priority workable feature. Use ONLY when the user says \"next feature\" or \"what's next\".",
     {
       project_id: z.string().optional().describe('Project UUID'),
@@ -138,7 +133,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_render_feature_tree',
+    'render_feature_tree',
     'Render the feature tree as ASCII art with state symbols. Optionally filter by leaf state.',
     {
       project_id: z.string().optional().describe('Project UUID'),
@@ -150,7 +145,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_orient',
+    'orient',
     'Session bootloader. Returns project overview: feature tree (depth 2), work queue, recent activity. Call at session start.',
     {
       project_id: z.string().optional().describe('Project UUID (optional if directory_path provided)'),
@@ -160,11 +155,11 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   // ----------------------------------------------------------
-  // Work Tools (4)
+  // Work Tools (5)
   // ----------------------------------------------------------
 
   server.tool(
-    'manifest_start_feature',
+    'start_feature',
     'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
@@ -176,7 +171,17 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_update_feature',
+    'assess_plan',
+    'Assess a numbered implementation plan for a feature and return a graded ceremony tier: auto, tracked, or full. Use after start_feature.',
+    {
+      feature_id: z.string().describe('Feature UUID or display ID'),
+      plan: z.string().describe('Implementation plan text. Prefer a `Plan:` header followed by numbered steps. Include `[COMPLEX]` to escalate.'),
+    },
+    async (params) => textResult(await handleAssessPlan(client, params)),
+  );
+
+  server.tool(
+    'update_feature',
     'Update any feature field: title, details, state, priority, parent, version.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
@@ -195,7 +200,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_prove_feature',
+    'prove_feature',
     'Record test evidence for a feature. Creates a proof with command, exit code, and structured results. IMPORTANT: Parse test output into individual test entries (one per test case). Use verbose flags (rspec --format documentation, pytest -v, go test -v) to get parseable output. Never collapse multiple tests into one entry.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
@@ -233,8 +238,8 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_complete_feature',
-    'Mark work as done. Records history with summary and commits, sets state to implemented.',
+    'complete_feature',
+    'Mark work as done. Records history with summary and commits, sets state to implemented. After completing, briefly explain what you built and why it improves the project.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       summary: z.string().describe('Work summary. First line = headline.'),
@@ -248,11 +253,11 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   // ----------------------------------------------------------
-  // Setup Tools (9)
+  // Setup Tools (8)
   // ----------------------------------------------------------
 
   server.tool(
-    'manifest_init_project',
+    'init_project',
     'Initialize a project from a directory. Analyzes codebase, creates project, returns size signals.',
     {
       directory_path: z.string().describe('Absolute path to the project directory'),
@@ -262,7 +267,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_add_project_directory',
+    'add_project_directory',
     'Associate an additional directory with a project (monorepo support).',
     {
       project_id: z.string().describe('Project UUID'),
@@ -275,7 +280,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_create_feature',
+    'create_feature',
     'Create a single feature. Check find_features for duplicates first.',
     {
       project_id: z.string().describe('Project UUID'),
@@ -289,7 +294,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_delete_feature',
+    'delete_feature',
     'Permanently delete a feature and descendants. Use only for archived features.',
     {
       feature_id: z.string().describe('Feature UUID'),
@@ -298,7 +303,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_decompose',
+    'decompose',
     'Decompose a PRD or vision into a feature tree. Use confirm=false to preview, confirm=true to create.',
     {
       project_id: z.string().describe('Project UUID'),
@@ -310,16 +315,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_get_project_instructions',
-    'Get full project instructions (coding guidelines, conventions).',
-    {
-      project_id: z.string().describe('Project UUID'),
-    },
-    async (params) => textResult(await handleGetProjectInstructions(client, params)),
-  );
-
-  server.tool(
-    'manifest_get_project_history',
+    'get_project_history',
     'Get recent activity timeline. Display directly without reformatting.',
     {
       project_id: z.string().describe('Project UUID'),
@@ -330,7 +326,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_generate_feature_tree',
+    'generate_feature_tree',
     'Analyze a codebase directory and generate a proposed feature tree from its structure.',
     {
       directory_path: z.string().describe('Absolute path to the project directory to analyze'),
@@ -339,7 +335,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_sync',
+    'sync',
     'Reconcile the feature tree with git history. Returns sync proposals.',
     {
       project_id: z.string().describe('Project UUID'),
@@ -352,7 +348,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   // ----------------------------------------------------------
 
   server.tool(
-    'manifest_list_versions',
+    'list_versions',
     'List versions with status indicators (next, planned, released).',
     {
       project_id: z.string().describe('Project UUID'),
@@ -361,7 +357,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_create_version',
+    'create_version',
     "Create a release milestone. Name must be semantic version (e.g., 0.2.0).",
     {
       project_id: z.string().describe('Project UUID'),
@@ -372,7 +368,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_set_feature_version',
+    'set_feature_version',
     'Assign a feature to a version. Pass null to unassign.',
     {
       feature_id: z.string().describe('Feature UUID'),
@@ -382,7 +378,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_release_version',
+    'release_version',
     'Mark a version as shipped.',
     {
       version_id: z.string().describe('Version UUID'),
@@ -395,7 +391,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   // ----------------------------------------------------------
 
   server.tool(
-    'manifest_verify_feature',
+    'verify_feature',
     'Assemble spec + diff for checking implementation against spec. You are the LLM.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
@@ -405,7 +401,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_record_verification',
+    'record_verification',
     'Store verification comments. Pass empty array if implementation satisfies spec.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
@@ -420,7 +416,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   server.tool(
-    'manifest_get_feature_proof',
+    'get_feature_proof',
     'Get latest proof and verification status for a feature.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),

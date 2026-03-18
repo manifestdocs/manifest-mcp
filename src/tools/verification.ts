@@ -5,6 +5,7 @@
 import type { ManifestClient } from '../client.js';
 import { ApiError } from '../client.js';
 import { renderProofChecklist, timeBucket } from '../format.js';
+import type { FeatureProof, VerificationComment } from '../types.js';
 
 // ============================================================
 // verify_feature
@@ -36,12 +37,7 @@ export async function handleVerifyFeature(
 
 interface RecordVerificationParams {
   feature_id: string;
-  comments: Array<{
-    severity: string;
-    title: string;
-    body: string;
-    file?: string;
-  }>;
+  comments: VerificationComment[];
 }
 
 export async function handleRecordVerification(
@@ -50,7 +46,7 @@ export async function handleRecordVerification(
 ): Promise<string> {
   const { feature_id, ...input } = params;
   try {
-    const result = await client.recordVerification(feature_id, input as any);
+    const result = await client.recordVerification(feature_id, input);
     const count = params.comments.length;
     if (count === 0) {
       return 'Verification recorded: passed (no comments)';
@@ -77,7 +73,7 @@ export async function handleGetFeatureProof(
   params: GetFeatureProofParams,
 ): Promise<string> {
   try {
-    const result = await client.getFeatureProof(params.feature_id) as any;
+    const result = await client.getFeatureProof(params.feature_id);
     if (!result) return 'No proof recorded for this feature.';
     return formatProof(result);
   } catch (err) {
@@ -89,7 +85,7 @@ export async function handleGetFeatureProof(
   }
 }
 
-function formatProof(proof: any): string {
+function formatProof(proof: FeatureProof): string {
   const parts: string[] = [];
   const exitIcon = proof.exit_code === 0 ? '\u2713' : '\u2717'; // ✓ or ✗
   const status = proof.exit_code === 0 ? 'PASSED' : 'FAILED';
@@ -103,7 +99,7 @@ function formatProof(proof: any): string {
   if (proof.commit_sha) parts.push(`  Commit: ${proof.commit_sha}`);
 
   // Test results — use the checklist renderer
-  const suites = proof.test_suites ?? proof.tests;
+  const suites = buildProofSuites(proof);
   if (Array.isArray(suites) && suites.length > 0) {
     parts.push('');
     parts.push(renderProofChecklist(suites));
@@ -134,4 +130,35 @@ function formatProof(proof: any): string {
 function formatResponse(data: unknown): string {
   if (typeof data === 'string') return data;
   return JSON.stringify(data, null, 2);
+}
+
+interface ProofChecklistTest {
+  name: string;
+  state: string;
+  duration_ms?: number | null;
+  message?: string | null;
+}
+
+interface ProofChecklistSuite {
+  name: string;
+  file?: string | null;
+  tests: ProofChecklistTest[];
+}
+
+function buildProofSuites(proof: FeatureProof): ProofChecklistSuite[] {
+  if (Array.isArray(proof.test_suites) && proof.test_suites.length > 0) {
+    return proof.test_suites;
+  }
+  if (!Array.isArray(proof.tests) || proof.tests.length === 0) {
+    return [];
+  }
+  return [{
+    name: 'Tests',
+    tests: proof.tests.map((test) => ({
+      name: test.name,
+      state: test.state,
+      duration_ms: test.duration_ms,
+      message: test.message,
+    })),
+  }];
 }

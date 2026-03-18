@@ -4,6 +4,12 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError } from '../client.js';
+import type {
+  CreateFeatureInput,
+  Feature,
+  ProjectHistoryEntry,
+  ProposedFeature,
+} from '../types.js';
 
 // ============================================================
 // init_project
@@ -63,11 +69,6 @@ export async function handleAddProjectDirectory(
 
 interface CreateFeatureParams {
   project_id: string;
-  parent_id?: string;
-  title: string;
-  details?: string;
-  state?: string;
-  priority?: number;
 }
 
 export async function handleCreateFeature(
@@ -76,7 +77,7 @@ export async function handleCreateFeature(
 ): Promise<string> {
   const { project_id, ...input } = params;
   try {
-    const result = await client.createFeature(project_id, input as any);
+    const result: Feature = await client.createFeature(project_id, input as CreateFeatureInput);
     return `Created '${result.title}' (${result.state})\nid: ${result.id}`;
   } catch (err) {
     if (err instanceof ApiError) {
@@ -115,13 +116,7 @@ export async function handleDeleteFeature(
 
 interface PlanParams {
   project_id: string;
-  features: Array<{
-    title: string;
-    details?: string;
-    priority: number;
-    state?: string;
-    children: any[];
-  }>;
+  features: ProposedFeature[];
   confirm: boolean;
   target_version_id?: string;
 }
@@ -134,30 +129,6 @@ export async function handlePlan(
   try {
     const result = await client.planFeatures(project_id, input);
     return formatResponse(result);
-  } catch (err) {
-    if (err instanceof ApiError) {
-      return `Error (${err.status}): ${err.body}`;
-    }
-    throw err;
-  }
-}
-
-// ============================================================
-// get_project_instructions
-// ============================================================
-
-interface GetProjectInstructionsParams {
-  project_id: string;
-}
-
-export async function handleGetProjectInstructions(
-  client: ManifestClient,
-  params: GetProjectInstructionsParams,
-): Promise<string> {
-  try {
-    const project = await client.getProject(params.project_id);
-    if (!project.instructions) return 'No project instructions set.';
-    return project.instructions;
   } catch (err) {
     if (err instanceof ApiError) {
       return `Error (${err.status}): ${err.body}`;

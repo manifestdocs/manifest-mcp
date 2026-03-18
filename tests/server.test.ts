@@ -37,42 +37,52 @@ describe('MCP Server', () => {
     expect(tools.length).toBe(26);
 
     const names = tools.map((t) => t.name).sort();
-    expect(names).toContain('manifest_list_projects');
-    expect(names).toContain('manifest_find_features');
-    expect(names).toContain('manifest_get_feature');
+    expect(names).toContain('list_projects');
+    expect(names).toContain('find_features');
+    expect(names).toContain('get_feature');
 
-    expect(names).toContain('manifest_get_next_feature');
-    expect(names).toContain('manifest_render_feature_tree');
-    expect(names).toContain('manifest_orient');
-    expect(names).toContain('manifest_start_feature');
-    expect(names).toContain('manifest_update_feature');
-    expect(names).toContain('manifest_prove_feature');
-    expect(names).toContain('manifest_complete_feature');
-    expect(names).toContain('manifest_init_project');
-    expect(names).toContain('manifest_add_project_directory');
-    expect(names).toContain('manifest_create_feature');
-    expect(names).toContain('manifest_delete_feature');
-    expect(names).toContain('manifest_decompose');
-    expect(names).toContain('manifest_get_project_instructions');
-    expect(names).toContain('manifest_get_project_history');
-    expect(names).toContain('manifest_generate_feature_tree');
-    expect(names).toContain('manifest_sync');
-    expect(names).toContain('manifest_list_versions');
-    expect(names).toContain('manifest_create_version');
-    expect(names).toContain('manifest_set_feature_version');
-    expect(names).toContain('manifest_release_version');
-    expect(names).toContain('manifest_verify_feature');
-    expect(names).toContain('manifest_record_verification');
-    expect(names).toContain('manifest_get_feature_proof');
+    expect(names).toContain('get_next_feature');
+    expect(names).toContain('render_feature_tree');
+    expect(names).toContain('orient');
+    expect(names).toContain('start_feature');
+    expect(names).toContain('assess_plan');
+    expect(names).toContain('update_feature');
+    expect(names).toContain('prove_feature');
+    expect(names).toContain('complete_feature');
+    expect(names).toContain('init_project');
+    expect(names).toContain('add_project_directory');
+    expect(names).toContain('create_feature');
+    expect(names).toContain('delete_feature');
+    expect(names).toContain('decompose');
+    expect(names).toContain('get_project_history');
+    expect(names).toContain('generate_feature_tree');
+    expect(names).toContain('sync');
+    expect(names).toContain('list_versions');
+    expect(names).toContain('create_version');
+    expect(names).toContain('set_feature_version');
+    expect(names).toContain('release_version');
+    expect(names).toContain('verify_feature');
+    expect(names).toContain('record_verification');
+    expect(names).toContain('get_feature_proof');
   });
 
-  it('round-trips manifest_list_projects', async () => {
+  it('describes post-completion explanation guidance on complete_feature', async () => {
+    const { client } = await createConnectedPair();
+    const { tools } = await client.listTools();
+
+    const completeTool = tools.find((tool) => tool.name === 'complete_feature');
+    expect(completeTool?.description).toContain(
+      'After completing, briefly explain what you built and why it improves the project.',
+    );
+  });
+
+  it('round-trips list_projects', async () => {
     const { client } = await createConnectedPair();
     const projects = [{ id: 'p1', name: 'Test Project', description: 'A test' }];
     mockFetch.mockResolvedValueOnce(jsonResponse(projects));
 
     const result = await client.callTool({
-      name: 'manifest_list_projects',
+      name: 'list_projects',
       arguments: {},
     });
 
@@ -82,7 +92,7 @@ describe('MCP Server', () => {
     expect(text).toContain('p1');
   });
 
-  it('round-trips manifest_get_feature', async () => {
+  it('round-trips get_feature', async () => {
     const { client } = await createConnectedPair();
     mockFetch.mockResolvedValueOnce(jsonResponse({
       id: 'f1',
@@ -96,12 +106,45 @@ describe('MCP Server', () => {
     }));
 
     const result = await client.callTool({
-      name: 'manifest_get_feature',
+      name: 'get_feature',
       arguments: { feature_id: 'f1' },
     });
 
     const text = (result.content as any[])[0].text;
     expect(text).toContain('Authentication');
     expect(text).toContain('proposed');
+  });
+
+  it('round-trips assess_plan', async () => {
+    const { client } = await createConnectedPair();
+    mockFetch.mockResolvedValueOnce(jsonResponse({
+      id: 'f1',
+      display_id: 'MAN-1',
+      title: 'Authentication',
+      details: `As a user, I can sign in.
+
+- [ ] Accept valid credentials
+- [ ] Reject invalid credentials
+- [ ] Show an auth error`,
+      state: 'in_progress',
+      priority: 1,
+      breadcrumb: [],
+      children: [],
+      siblings: [],
+    }));
+
+    const result = await client.callTool({
+      name: 'assess_plan',
+      arguments: {
+        feature_id: 'f1',
+        plan: 'Plan:\n1. Add sign-in tests\n2. Update the auth handler\n3. Record proof and completion state',
+      },
+    });
+
+    const text = (result.content as any[])[0].text;
+    expect(text).toContain('Plan assessment: tracked');
+    expect(text).toContain('Feature: MAN-1 Authentication');
+    expect(text).toContain('Steps: 3');
+    expect(text).toContain('Unchecked acceptance criteria: 3');
   });
 });

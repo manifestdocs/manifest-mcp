@@ -30,7 +30,6 @@ export interface Project {
   name: string;
   key_prefix: string;
   description?: string | null;
-  instructions?: string | null;
   current_version_id?: string | null;
   created_at: string;
   updated_at: string;
@@ -48,6 +47,11 @@ export interface ProjectDirectory {
 
 export interface ProjectWithDirectories extends Project {
   directories: ProjectDirectory[];
+}
+
+export interface ProjectLookupResult {
+  id?: string;
+  project?: Project;
 }
 
 // ============================================================
@@ -118,6 +122,35 @@ export interface FeatureTreeNode extends Feature {
   is_root?: boolean;
 }
 
+export interface FeatureListItem {
+  id: string;
+  display_id?: string | null;
+  title: string;
+  state: string;
+  priority: number;
+}
+
+export interface ProofStatus {
+  exit_code: number;
+  created_at: string;
+}
+
+export interface InProgressFeatureItem {
+  id: string;
+  title: string;
+  display_id?: string | null;
+  state?: string;
+  priority?: number;
+  proof_status?: ProofStatus | null;
+  completable: boolean;
+}
+
+export interface InProgressFeatureResponse {
+  error: string;
+  message: string;
+  features: InProgressFeatureItem[];
+}
+
 export interface FeatureHistory {
   id: string;
   feature_id: string;
@@ -154,6 +187,7 @@ export interface FeatureWithContext {
   desired_details?: string | null;
   state: string;
   priority: number;
+  feature_number?: number | null;
   target_version_id?: string | null;
   parent?: FeatureSummaryContext | null;
   siblings: FeatureSummaryContext[];
@@ -194,6 +228,26 @@ export interface CommitRef {
   sha: string;
   message: string;
   author?: string | null;
+}
+
+export interface FeatureProof {
+  id?: string;
+  command: string;
+  exit_code: number;
+  output?: string | null;
+  test_suites?: TestSuiteInput[];
+  tests?: TestResultInput[];
+  evidence?: EvidenceInput[];
+  commit_sha?: string | null;
+  agent_type?: string | null;
+  created_at?: string;
+}
+
+export interface StartFeatureResponse extends FeatureWithContext {
+  feature_tier?: string;
+  spec_status?: string;
+  spec_guidance?: string;
+  testing_guidance?: string;
 }
 
 // ============================================================

@@ -327,12 +327,12 @@ describe('ManifestClient', () => {
       );
     });
 
-    it('calls POST /features/{id}/verification for recordVerification', async () => {
+    it('calls PUT /features/{id}/verification for recordVerification', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.recordVerification('feat-1', { comments: [] });
       const [url, opts] = mockFetch.mock.calls[0];
       expect(url).toBe('http://localhost:4242/api/v1/features/feat-1/verification');
-      expect(opts.method).toBe('POST');
+      expect(opts.method).toBe('PUT');
     });
 
 });

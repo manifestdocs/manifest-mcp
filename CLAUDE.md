@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Overview
 
-`@manifestdocs/mcp` is a standalone MCP server that exposes 26 Manifest tools over stdio JSON-RPC 2.0. It is spawned by Claude Code or Cursor as a child process.
+`@manifestdocs/mcp` is a standalone MCP server that exposes 27 Manifest tools over stdio JSON-RPC 2.0. It is spawned by Claude Code or Cursor as a child process.
 
 ## Build & Test
 
@@ -19,7 +19,7 @@ pnpm check                      # Type-check without emitting
 ## Architecture
 
 - **`src/index.ts`** — CLI entry point: creates server, connects stdio transport
-- **`src/server.ts`** — `createServer()`: registers 26 tools with zod schemas, delegates to handlers
+- **`src/server.ts`** — `createServer()`: registers 27 tools with zod schemas, delegates to handlers
 - **`src/types.ts`** — Domain types (copied from manifest-pi, zero dependencies)
 - **`src/client.ts`** — HTTP client wrapping fetch() with typed methods
 - **`src/format.ts`** — Text rendering (trees, tables, state symbols, time buckets)
@@ -30,7 +30,7 @@ pnpm check                      # Type-check without emitting
 - **Zod schemas** for all tool parameters (required by MCP SDK)
 - **`agent_type: "claude"`** default for feature claims
 - **Default server URL**: `http://localhost:4242` (SvelteKit dev server)
-- Tool names prefixed with `manifest_`
+- Tool names do not repeat the server namespace prefix (for example `start_feature`, not `manifest_start_feature`)
 
 ## Configuration
 

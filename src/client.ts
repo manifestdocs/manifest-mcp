@@ -8,6 +8,7 @@
 import type {
   Project,
   ProjectWithDirectories,
+  ProjectLookupResult,
   Feature,
   FeatureTreeNode,
   FeatureWithContext,
@@ -23,6 +24,10 @@ import type {
   CommitRef,
   ProposedFeature,
   VerificationComment,
+  FeatureListItem,
+  FeatureProof,
+  StartFeatureResponse,
+  ProjectHistoryEntry,
 } from './types.js';
 
 // ============================================================
@@ -152,7 +157,7 @@ export class ManifestClient {
     return this.request('GET', '/projects');
   }
 
-  async listProjectsByDirectory(directoryPath: string): Promise<unknown> {
+  async listProjectsByDirectory(directoryPath: string): Promise<ProjectLookupResult> {
     const encoded = encodeURIComponent(directoryPath);
     return this.request('GET', `/projects/by-directory?path=${encoded}`);
   }
@@ -178,7 +183,7 @@ export class ManifestClient {
   async getProjectHistory(
     projectId: string,
     options?: { feature_id?: string; limit?: number },
-  ): Promise<unknown> {
+  ): Promise<ProjectHistoryEntry[]> {
     let path = `/projects/${projectId}/history`;
     const params = new URLSearchParams();
     if (options?.feature_id) params.set('feature_id', options.feature_id);
@@ -223,7 +228,7 @@ export class ManifestClient {
     version_id?: string;
     limit?: number;
     offset?: number;
-  }): Promise<unknown> {
+  }): Promise<FeatureListItem[]> {
     const { project_id, ...rest } = params;
     const base = project_id ? `/projects/${project_id}/features` : '/features';
     const qs = new URLSearchParams();
@@ -234,7 +239,7 @@ export class ManifestClient {
     return this.request('GET', query ? `${base}?${query}` : base);
   }
 
-  async getNextFeature(projectId: string, versionId?: string): Promise<unknown> {
+  async getNextFeature(projectId: string, versionId?: string): Promise<FeatureWithContext> {
     let path = `/projects/${projectId}/features/next`;
     if (versionId) path += `?version_id=${versionId}`;
     return this.request('GET', path);
@@ -247,14 +252,14 @@ export class ManifestClient {
   async startFeature(
     featureId: string,
     input: { agent_type?: string; force?: boolean; claim_metadata?: string },
-  ): Promise<unknown> {
+  ): Promise<StartFeatureResponse> {
     return this.request('PUT', `/features/${featureId}/claim`, input);
   }
 
   async completeFeature(
     featureId: string,
     input: { summary: string; commits: (string | CommitRef)[]; backfill?: boolean },
-  ): Promise<unknown> {
+  ): Promise<Feature> {
     return this.request('POST', `/features/${featureId}/complete`, input);
   }
 
@@ -269,11 +274,11 @@ export class ManifestClient {
       evidence?: EvidenceInput[];
       commit_sha?: string;
     },
-  ): Promise<unknown> {
+  ): Promise<FeatureProof> {
     return this.request('POST', `/features/${featureId}/proofs`, input);
   }
 
-  async getFeatureProof(featureId: string): Promise<unknown> {
+  async getFeatureProof(featureId: string): Promise<FeatureProof> {
     return this.request('GET', `/features/${featureId}/proofs/latest`);
   }
 
@@ -340,6 +345,6 @@ export class ManifestClient {
     featureId: string,
     input: { comments: VerificationComment[] },
   ): Promise<unknown> {
-    return this.request('POST', `/features/${featureId}/verification`, input);
+    return this.request('PUT', `/features/${featureId}/verification`, input);
   }
 }
