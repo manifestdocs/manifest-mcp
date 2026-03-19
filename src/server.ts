@@ -160,7 +160,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'start_feature',
-    'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing.',
+    'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing. After starting, investigate the codebase, then write a numbered plan and call assess_plan before implementing.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       agent_type: AgentTypeEnum.optional().describe("Agent type. Defaults to 'claude'."),
@@ -172,7 +172,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'assess_plan',
-    'Assess a numbered implementation plan for a feature and return a graded ceremony tier: auto, tracked, or full. Use after start_feature.',
+    'Assess a numbered implementation plan for a feature and return a graded ceremony tier: auto, tracked, or full. Call this after start_feature with your implementation plan. Returns a ceremony tier (auto/tracked/full) that determines whether to proceed directly or pause for approval.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       plan: z.string().describe('Implementation plan text. Prefer a `Plan:` header followed by numbered steps. Include `[COMPLEX]` to escalate.'),
@@ -182,7 +182,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'update_feature',
-    'Update any feature field: title, details, state, priority, parent, version.',
+    'Update any feature field: title, details, state, priority, parent, version. Call before complete_feature to document what was built. The spec must be updated after starting work.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       title: z.string().optional().describe('New title'),
@@ -201,7 +201,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'prove_feature',
-    'Record test evidence for a feature. Creates a proof with command, exit code, and structured results. IMPORTANT: Parse test output into individual test entries (one per test case). Use verbose flags (rspec --format documentation, pytest -v, go test -v) to get parseable output. Never collapse multiple tests into one entry.',
+    'Record test evidence for a feature. Call after implementation. Tests must pass (exit_code 0) before you can complete the feature. IMPORTANT: Parse test output into individual test entries (one per test case). Use verbose flags (rspec --format documentation, pytest -v, go test -v) to get parseable output. Never collapse multiple tests into one entry.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       command: z.string().describe("Test command run (e.g., 'vitest run')"),
@@ -239,7 +239,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'complete_feature',
-    'Mark work as done. Records history with summary and commits, sets state to implemented. After completing, briefly explain what you built and why it improves the project.',
+    'Mark work as done. Requires: passing proof recorded via prove_feature, and spec updated via update_feature since work started. Records history with summary and commits, sets state to implemented.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       summary: z.string().describe('Work summary. First line = headline.'),

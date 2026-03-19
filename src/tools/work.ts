@@ -116,6 +116,17 @@ function formatStartResult(result: StartFeatureResponse): string {
     parts.push(result.testing_guidance);
   }
 
+  // Workflow instructions
+  parts.push('');
+  parts.push('## Workflow');
+  parts.push('');
+  parts.push('1. INVESTIGATE: Read the codebase to understand what needs to change (read-only -- no edits yet)');
+  parts.push('2. PLAN: Write a numbered implementation plan, then call assess_plan');
+  parts.push('3. BUILD: Implement the plan (if tier is \'full\', confirm with the user first)');
+  parts.push('4. PROVE: Run tests, then call prove_feature with the results');
+  parts.push('5. UPDATE SPEC: Call update_feature to document what you built');
+  parts.push('6. COMPLETE: Call complete_feature with a summary and commit SHAs');
+
   return parts.join('\n');
 }
 
@@ -158,11 +169,11 @@ function formatPlanAssessment(feature: FeatureWithContext, planText: string): st
   parts.push('');
   parts.push('Guidance');
   if (tier === 'auto') {
-    parts.push('Execute directly. This is a small change and does not need a separate approval gate.');
+    parts.push('Proceed with implementation. No approval needed.');
   } else if (tier === 'tracked') {
-    parts.push('Proceed with execution, but track progress step-by-step using `[DONE:n]` markers as you finish each numbered item.');
+    parts.push('Proceed with implementation. Mark progress with [DONE:n] as you complete each step.');
   } else {
-    parts.push('Pause for approval or refine the plan before editing. This plan is large or risky enough to justify an explicit checkpoint.');
+    parts.push('Present this plan to the user for approval before implementing. The scope is large enough to warrant a checkpoint.');
   }
 
   parts.push('');
