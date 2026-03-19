@@ -182,6 +182,7 @@ export interface FeatureSummaryContext {
 export interface FeatureWithContext {
   id: string;
   display_id?: string | null;
+  project_slug?: string | null;
   title: string;
   details?: string | null;
   desired_details?: string | null;

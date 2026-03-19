@@ -3,7 +3,7 @@
  */
 
 import type { ManifestClient } from '../client.js';
-import { ApiError, ConflictError, ConnectionError } from '../client.js';
+import { ApiError, ConflictError, ConnectionError, NotFoundError } from '../client.js';
 import type {
   FeatureListItem,
   FeatureWithContext,
@@ -13,7 +13,7 @@ import type {
   Project,
   ProjectHistoryEntry,
 } from '../types.js';
-import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb, renderFeatureCard } from '../format.js';
+import { renderTree, filterTree, stateSymbol, markdownTable, lodBreadcrumb, renderFeatureCard, featureWebUrl } from '../format.js';
 
 // ============================================================
 // list_projects
@@ -114,7 +114,7 @@ export async function handleGetFeature(
 
     // Card view — compact, pre-formatted, ready for direct display
     if (view === 'card') {
-      return renderFeatureCard(ctx);
+      return renderFeatureCard(ctx, client.webUrl);
     }
 
     // Full view — includes breadcrumb context, siblings, and optional history
@@ -126,6 +126,8 @@ export async function handleGetFeature(
     parts.push(`ID: ${ctx.id}`);
     parts.push(`Priority: ${ctx.priority}`);
     if (ctx.parent) parts.push(`Parent: ${ctx.parent.title}`);
+    const webUrl = featureWebUrl(client.webUrl, ctx.project_slug, ctx.display_id);
+    if (webUrl) parts.push(`Web: ${webUrl}`);
 
     // Breadcrumb context
     if (ctx.breadcrumb.length > 0) {
@@ -214,6 +216,7 @@ export async function handleGetNextFeature(
     if (!result || !result.id) return 'No workable features found.';
     return formatFeatureSummary(result);
   } catch (err) {
+    if (err instanceof NotFoundError) return 'No workable features found.';
     if (err instanceof ConflictError) {
       return formatStaleFeatures(err.body);
     }
@@ -346,8 +349,13 @@ async function resolveProjectId(
 ): Promise<string | null> {
   if (params.project_id) return params.project_id;
   if (!params.directory_path) return null;
-  const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
-  return project?.id ?? null;
+  try {
+    const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
+    return project?.id ?? null;
+  } catch (err) {
+    if (err instanceof NotFoundError) return null;
+    throw err;
+  }
 }
 
 async function resolveOrientProject(
@@ -359,9 +367,14 @@ async function resolveOrientProject(
   }
   if (!params.directory_path) return null;
 
-  const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
-  if (!project?.id) return null;
-  return { projectId: project.id, projectName: project.name };
+  try {
+    const project = resolveProject(await client.listProjectsByDirectory(params.directory_path));
+    if (!project?.id) return null;
+    return { projectId: project.id, projectName: project.name };
+  } catch (err) {
+    if (err instanceof NotFoundError) return null;
+    throw err;
+  }
 }
 
 async function loadProjectKeyPrefix(

@@ -61,7 +61,12 @@ export function displayId(
  * Render a feature as a compact card suitable for direct display.
  * Designed so agents can pass it through without reformatting.
  */
-export function renderFeatureCard(ctx: FeatureWithContext): string {
+export function featureWebUrl(baseUrl: string, projectSlug?: string | null, displayId?: string | null): string | null {
+  if (!projectSlug || !displayId) return null;
+  return `${baseUrl}/app/${projectSlug}?feature=${displayId}`;
+}
+
+export function renderFeatureCard(ctx: FeatureWithContext, baseUrl?: string): string {
   const id = ctx.display_id ?? ctx.id.slice(0, 8);
   const sym = stateSymbol(ctx.state);
   const W = 60;
@@ -74,6 +79,8 @@ export function renderFeatureCard(ctx: FeatureWithContext): string {
   lines.push(`${sym} ${id}  ${ctx.title}`);
   lines.push(`  State: ${ctx.state}  Priority: ${ctx.priority}`);
   if (ctx.parent) lines.push(`  Parent: ${ctx.parent.title}`);
+  const webUrl = baseUrl ? featureWebUrl(baseUrl, ctx.project_slug, ctx.display_id) : null;
+  if (webUrl) lines.push(`  Web: ${webUrl}`);
   lines.push(hr);
 
   // Details / spec
