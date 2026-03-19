@@ -239,7 +239,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'complete_feature',
-    'Mark work as done. Requires: passing proof recorded via prove_feature, and spec updated via update_feature since work started. Records history with summary and commits, sets state to implemented.',
+    'Mark work as done. Requires: passing proof recorded via prove_feature, and spec updated via update_feature since work started. Records history with summary and commits, sets state to implemented. After completing, briefly explain what you built and why it improves the project.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       summary: z.string().describe('Work summary. First line = headline.'),

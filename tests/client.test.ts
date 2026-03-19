@@ -126,11 +126,11 @@ describe('ManifestClient', () => {
       );
     });
 
-    it('calls GET /projects/by-directory with path query param', async () => {
+    it('calls GET /projects?directory= with path query param', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ project: {}, directories: [] }));
       await client.listProjectsByDirectory('/my/path');
       const url = mockFetch.mock.calls[0][0];
-      expect(url).toContain('/projects/by-directory?path=');
+      expect(url).toContain('/projects?directory=');
       expect(url).toContain(encodeURIComponent('/my/path'));
     });
 
@@ -195,11 +195,11 @@ describe('ManifestClient', () => {
       expect(opts.method).toBe('PUT');
     });
 
-    it('calls GET /projects/{id}/features/tree for getFeatureTree', async () => {
+    it('calls GET /projects/{id}/features?format=tree for getFeatureTree', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse([]));
       await client.getFeatureTree('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4242/api/v1/projects/proj-1/features/tree',
+        'http://localhost:4242/api/v1/projects/proj-1/features?format=tree',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -230,11 +230,11 @@ describe('ManifestClient', () => {
       );
     });
 
-    it('calls GET /projects/{id}/features/next for getNextFeature', async () => {
+    it('calls GET /projects/{id}/features?next=true for getNextFeature', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ id: '1' }));
       await client.getNextFeature('proj-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4242/api/v1/projects/proj-1/features/next',
+        'http://localhost:4242/api/v1/projects/proj-1/features?next=true',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -268,12 +268,14 @@ describe('ManifestClient', () => {
       expect(opts.method).toBe('PUT');
     });
 
-    it('calls POST /versions/{id}/release for releaseVersion', async () => {
+    it('calls PUT /versions/{id} with released_at for releaseVersion', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.releaseVersion('ver-1');
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:4242/api/v1/versions/ver-1/release');
-      expect(opts.method).toBe('POST');
+      expect(url).toBe('http://localhost:4242/api/v1/versions/ver-1');
+      expect(opts.method).toBe('PUT');
+      const body = JSON.parse(opts.body);
+      expect(body.released_at).toBeDefined();
     });
 
     it('calls GET /projects/{id}/history for getProjectHistory', async () => {
@@ -285,11 +287,11 @@ describe('ManifestClient', () => {
       );
     });
 
-    it('calls GET /features/{id}/proofs/latest for getFeatureProof', async () => {
+    it('calls GET /features/{id}/proofs?latest=true for getFeatureProof', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.getFeatureProof('feat-1');
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4242/api/v1/features/feat-1/proofs/latest',
+        'http://localhost:4242/api/v1/features/feat-1/proofs?latest=true',
         expect.objectContaining({ method: 'GET' }),
       );
     });
@@ -310,11 +312,11 @@ describe('ManifestClient', () => {
       expect(opts.method).toBe('POST');
     });
 
-    it('calls POST /projects/{id}/features/plan for planFeatures', async () => {
+    it('calls POST /projects/{id}/features for planFeatures', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({ proposed_features: [] }));
       await client.planFeatures('proj-1', { features: [], confirm: false });
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/features/plan');
+      expect(url).toBe('http://localhost:4242/api/v1/projects/proj-1/features');
       expect(opts.method).toBe('POST');
     });
 
