@@ -66,12 +66,15 @@ interface FindFeaturesParams {
   offset?: number;
 }
 
+const DEFAULT_FIND_LIMIT = 50;
+
 export async function handleFindFeatures(
   client: ManifestClient,
   params: FindFeaturesParams,
 ): Promise<string> {
   try {
-    const features = await client.findFeatures(params);
+    const limit = params.limit ?? DEFAULT_FIND_LIMIT;
+    const features = await client.findFeatures({ ...params, limit });
     if (!features || features.length === 0) return 'No features found.';
 
     const rows = features.map((f: FeatureListItem) => [
@@ -81,7 +84,11 @@ export async function handleFindFeatures(
       String(f.priority),
       f.title,
     ]);
-    return markdownTable(['ID', 'UUID', 'State', 'P', 'Title'], rows);
+    let result = markdownTable(['ID', 'UUID', 'State', 'P', 'Title'], rows);
+    if (features.length >= limit) {
+      result += `\n\nShowing first ${limit} results. Use limit/offset for more.`;
+    }
+    return result;
   } catch (err) {
     return handleError(err);
   }
