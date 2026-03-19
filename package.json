@@ -7,6 +7,11 @@
   "bin": {
     "manifest-mcp": "dist/index.js"
   },
+  "main": "dist/server.js",
+  "exports": {
+    ".": "./dist/server.js",
+    "./client": "./dist/client.js"
+  },
   "files": [
     "dist",
     "package.json"
