@@ -72,7 +72,7 @@ describe('MCP Server', () => {
 
     const completeTool = tools.find((tool) => tool.name === 'complete_feature');
     expect(completeTool?.description).toContain(
-      'After completing, briefly explain what you built and why it improves the project.',
+      'The server validates proof and spec update requirements.',
     );
   });
 

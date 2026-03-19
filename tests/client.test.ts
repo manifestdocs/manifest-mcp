@@ -320,12 +320,12 @@ describe('ManifestClient', () => {
       expect(opts.method).toBe('POST');
     });
 
-    it('calls GET /features/{id}/verify for verifyFeature', async () => {
+    it('calls POST /features/{id}/verify for verifyFeature', async () => {
       mockFetch.mockResolvedValueOnce(jsonResponse({}));
       await client.verifyFeature('feat-1');
       expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost:4242/api/v1/features/feat-1/verify',
-        expect.objectContaining({ method: 'GET' }),
+        expect.objectContaining({ method: 'POST' }),
       );
     });
 

@@ -98,6 +98,8 @@ export class ManifestClient {
     this.apiKey = config?.apiKey;
   }
 
+  get webUrl(): string { return this.baseUrl; }
+
   private get apiUrl(): string {
     return `${this.baseUrl}/api/v1`;
   }
@@ -340,7 +342,7 @@ export class ManifestClient {
   async verifyFeature(featureId: string, commitRange?: string): Promise<unknown> {
     let path = `/features/${featureId}/verify`;
     if (commitRange) path += `?commit_range=${encodeURIComponent(commitRange)}`;
-    return this.request('GET', path);
+    return this.request('POST', path);
   }
 
   async recordVerification(

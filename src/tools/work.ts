@@ -4,6 +4,7 @@
 
 import type { ManifestClient } from '../client.js';
 import { ApiError, ConflictError } from '../client.js';
+import { featureWebUrl } from '../format.js';
 import type {
   CommitRef,
   EvidenceInput,
@@ -42,7 +43,7 @@ export async function handleStartFeature(
       force: params.force ?? false,
       claim_metadata: params.claim_metadata,
     });
-    return formatStartResult(result);
+    return formatStartResult(result, client.webUrl);
   } catch (err) {
     if (err instanceof ConflictError) {
       return `Error: ${err.body}`;
@@ -69,7 +70,7 @@ export async function handleAssessPlan(
   }
 }
 
-function formatStartResult(result: StartFeatureResponse): string {
+function formatStartResult(result: StartFeatureResponse, baseUrl?: string): string {
   if (!result || typeof result !== 'object') return 'Feature started.';
 
   const parts: string[] = [];
@@ -78,6 +79,8 @@ function formatStartResult(result: StartFeatureResponse): string {
   const displayId = result.display_id ?? result.id?.slice(0, 8) ?? '';
   parts.push(`Started: ${displayId} ${result.title ?? ''} (${result.state ?? 'in_progress'})`);
   if (result.feature_tier) parts.push(`Tier: ${result.feature_tier}`);
+  const webUrl = baseUrl ? featureWebUrl(baseUrl, result.project_slug, result.display_id) : null;
+  if (webUrl) parts.push(`Web: ${webUrl}`);
 
   // Spec status
   if (result.spec_status) parts.push(`Spec: ${result.spec_status}`);
@@ -118,14 +121,9 @@ function formatStartResult(result: StartFeatureResponse): string {
 
   // Workflow instructions
   parts.push('');
-  parts.push('## Workflow');
+  parts.push('## Next');
   parts.push('');
-  parts.push('1. INVESTIGATE: Read the codebase to understand what needs to change (read-only -- no edits yet)');
-  parts.push('2. PLAN: Write a numbered implementation plan, then call assess_plan');
-  parts.push('3. BUILD: Implement the plan (if tier is \'full\', confirm with the user first)');
-  parts.push('4. PROVE: Run tests, then call prove_feature with the results');
-  parts.push('5. UPDATE SPEC: Call update_feature to document what you built');
-  parts.push('6. COMPLETE: Call complete_feature with a summary and commit SHAs');
+  parts.push('Investigate the codebase, then write a numbered plan and call assess_plan.');
 
   return parts.join('\n');
 }

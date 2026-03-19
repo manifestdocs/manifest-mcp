@@ -160,7 +160,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'start_feature',
-    'Start work on a feature. Transitions to in_progress and records your claim. MUST be called before implementing. After starting, investigate the codebase, then write a numbered plan and call assess_plan before implementing.',
+    'Transitions to in_progress and records your claim. Returns the spec to implement against.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       agent_type: AgentTypeEnum.optional().describe("Agent type. Defaults to 'claude'."),
@@ -239,7 +239,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'complete_feature',
-    'Mark work as done. Requires: passing proof recorded via prove_feature, and spec updated via update_feature since work started. Records history with summary and commits, sets state to implemented. After completing, briefly explain what you built and why it improves the project.',
+    'Records history with summary and commits. The server validates proof and spec update requirements.',
     {
       feature_id: z.string().describe('Feature UUID or display ID'),
       summary: z.string().describe('Work summary. First line = headline.'),
@@ -281,7 +281,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'create_feature',
-    'Create a single feature. Check find_features for duplicates first.',
+    'Create a single feature describing a system CAPABILITY (what users can do), not an implementation task. Features are living documentation — they should make sense long after the code is written. Good: "Image upload", "Email notifications". Bad: "Set up S3 bucket", "Phase 2: Add endpoint". Check find_features for duplicates first.',
     {
       project_id: z.string().describe('Project UUID'),
       parent_id: z.string().optional().describe('Parent feature UUID'),
@@ -304,7 +304,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'decompose',
-    'Decompose a PRD or vision into a feature tree. Use confirm=false to preview, confirm=true to create.',
+    'Decompose a PRD or vision into a feature tree of CAPABILITIES, not implementation phases or tasks. Each feature should describe what users can do, not how to build it. Use confirm=false to preview, confirm=true to create.',
     {
       project_id: z.string().describe('Project UUID'),
       features: z.array(ProposedFeatureSchema).describe('Proposed feature tree'),
