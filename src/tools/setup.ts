@@ -164,29 +164,6 @@ export async function handleGetProjectHistory(
 }
 
 // ============================================================
-// generate_feature_tree
-// ============================================================
-
-interface GenerateFeatureTreeParams {
-  directory_path: string;
-}
-
-export async function handleGenerateFeatureTree(
-  client: ManifestClient,
-  params: GenerateFeatureTreeParams,
-): Promise<string> {
-  try {
-    const result = await client.analyzeCodebase(params.directory_path);
-    return formatResponse(result);
-  } catch (err) {
-    if (err instanceof ApiError) {
-      return `Error (${err.status}): ${err.body}`;
-    }
-    throw err;
-  }
-}
-
-// ============================================================
 // sync
 // ============================================================
 

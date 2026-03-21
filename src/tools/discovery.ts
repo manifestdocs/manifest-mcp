@@ -298,6 +298,16 @@ export async function handleOrient(
       client.findFeatures({ project_id: projectId, state: 'proposed', limit: 3 }).catch(() => []),
       client.getProjectHistory(projectId, { limit: 5 }).catch(() => []),
     ]);
+    // Empty project detection: single root node with no children
+    const isEmpty = Array.isArray(tree)
+      && tree.length === 1
+      && tree[0].is_root === true
+      && tree[0].children.length === 0;
+
+    if (isEmpty) {
+      return formatEmptyProjectGuidance(projectName, projectId);
+    }
+
     const keyPrefix = await loadProjectKeyPrefix(client, projectId, Array.isArray(tree) && tree.length > 0);
 
     const parts: string[] = [];
@@ -341,6 +351,25 @@ export async function handleOrient(
 // ============================================================
 // Helpers
 // ============================================================
+
+function formatEmptyProjectGuidance(projectName: string, projectId: string): string {
+  const parts: string[] = [];
+
+  if (projectName) parts.push(`# ${projectName}`);
+  parts.push(`Project: ${projectId}`);
+  parts.push('');
+  parts.push('## Empty Project');
+  parts.push('This project has no features yet. The feature tree needs to be bootstrapped.');
+  parts.push('');
+  parts.push('## Next Steps');
+  parts.push('1. Gather input: read a PRD, ask the user to describe capabilities, or analyze the codebase');
+  parts.push('2. Decompose into capabilities: call decompose with confirm=false to preview the feature tree');
+  parts.push('3. Confirm: call decompose with confirm=true to create the features');
+  parts.push('4. Set root context: call update_feature on the root feature to add project overview, tech stack, and conventions');
+  parts.push('5. Create versions: call create_version for initial milestones, then set_feature_version to assign features');
+
+  return parts.join('\n');
+}
 
 /** Resolve project_id from either direct ID or directory_path auto-discovery. */
 async function resolveProjectId(

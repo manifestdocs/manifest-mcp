@@ -31,10 +31,10 @@ describe('MCP Server', () => {
     return { server, client };
   }
 
-  it('registers all 26 tools', async () => {
+  it('registers all 25 tools', async () => {
     const { client } = await createConnectedPair();
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(26);
+    expect(tools.length).toBe(25);
 
     const names = tools.map((t) => t.name).sort();
     expect(names).toContain('list_projects');
@@ -55,7 +55,6 @@ describe('MCP Server', () => {
     expect(names).toContain('delete_feature');
     expect(names).toContain('decompose');
     expect(names).toContain('get_project_history');
-    expect(names).toContain('generate_feature_tree');
     expect(names).toContain('sync');
     expect(names).toContain('list_versions');
     expect(names).toContain('create_version');

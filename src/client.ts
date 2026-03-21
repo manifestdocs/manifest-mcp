@@ -327,10 +327,6 @@ export class ManifestClient {
   // Analysis & Sync
   // ============================================================
 
-  async analyzeCodebase(directoryPath: string): Promise<unknown> {
-    return this.request('GET', `/codebase/analyze?directory_path=${encodeURIComponent(directoryPath)}`);
-  }
-
   async syncFeatures(projectId: string): Promise<unknown> {
     return this.request('POST', `/projects/${projectId}/sync`);
   }
@@ -342,7 +338,7 @@ export class ManifestClient {
   async verifyFeature(featureId: string, commitRange?: string): Promise<unknown> {
     let path = `/features/${featureId}/verify`;
     if (commitRange) path += `?commit_range=${encodeURIComponent(commitRange)}`;
-    return this.request('POST', path);
+    return this.request('POST', path, {});
   }
 
   async recordVerification(

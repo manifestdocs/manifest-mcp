@@ -1,7 +1,7 @@
 /**
  * Manifest MCP Server
  *
- * Registers 26 tools with zod schemas, delegates to pure handler functions.
+ * Registers 25 tools with zod schemas, delegates to pure handler functions.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,7 +30,6 @@ import {
   handleDeleteFeature,
   handlePlan,
   handleGetProjectHistory,
-  handleGenerateFeatureTree,
   handleSync,
 } from './tools/setup.js';
 import {
@@ -72,16 +71,42 @@ const ProposedFeatureSchema: z.ZodType<ProposedFeature> = z.lazy(() =>
 );
 
 // ============================================================
+// Server Instructions
+// ============================================================
+
+const MANIFEST_INSTRUCTIONS = `Manifest tracks features (system capabilities), not tasks. Features are living documentation that evolves with the codebase.
+
+## Session Start
+Always call orient with directory_path to discover the project and its current state.
+
+## Bootstrap Protocol (orient reports empty project)
+1. Gather input: read a PRD, ask the user to describe capabilities, or analyze the codebase yourself
+2. Analyze: decompose the input into a tree of capabilities (not tasks or phases)
+3. Preview: call decompose with confirm=false to review the proposed tree
+4. Confirm: call decompose with confirm=true to create the features
+5. Root context: call update_feature on the root to set details (project overview, tech stack, conventions)
+6. Versions: call create_version for initial milestones, then set_feature_version to assign features
+
+## Work Protocol
+get_next_feature -> start_feature -> assess_plan -> implement -> prove_feature -> update_feature (spec) -> complete_feature
+
+## Conventions
+- Features describe capabilities ("Image upload"), not tasks ("Set up S3 bucket")
+- Parent features hold shared context in details; leaf features are implementable units
+- All features should be assigned to a version
+- Proof (test evidence) is required before completing a feature`;
+
+// ============================================================
 // createServer
 // ============================================================
 
 export function createServer(config?: ManifestClientConfig): McpServer {
   const client = new ManifestClient(config);
 
-  const server = new McpServer({
-    name: 'manifest',
-    version: '0.1.0',
-  });
+  const server = new McpServer(
+    { name: 'manifest', version: '0.1.0' },
+    { instructions: MANIFEST_INSTRUCTIONS },
+  );
 
   // ----------------------------------------------------------
   // Discovery Tools (7)
@@ -253,7 +278,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   // ----------------------------------------------------------
-  // Setup Tools (8)
+  // Setup Tools (7)
   // ----------------------------------------------------------
 
   server.tool(
@@ -323,15 +348,6 @@ export function createServer(config?: ManifestClientConfig): McpServer {
       limit: z.number().optional().describe('Max entries. Default 20.'),
     },
     async (params) => textResult(await handleGetProjectHistory(client, params)),
-  );
-
-  server.tool(
-    'generate_feature_tree',
-    'Analyze a codebase directory and generate a proposed feature tree from its structure.',
-    {
-      directory_path: z.string().describe('Absolute path to the project directory to analyze'),
-    },
-    async (params) => textResult(await handleGenerateFeatureTree(client, params)),
   );
 
   server.tool(
