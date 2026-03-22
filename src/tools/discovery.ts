@@ -349,6 +349,27 @@ export async function handleOrient(
 }
 
 // ============================================================
+// get_template
+// ============================================================
+
+interface GetTemplateParams {
+  project_id: string;
+}
+
+export async function handleGetTemplate(
+  client: ManifestClient,
+  params: GetTemplateParams,
+): Promise<string> {
+  try {
+    const template = await client.getProjectTemplate(params.project_id);
+    if (!template) return 'No custom template configured. Use the default spec format: user story + context + acceptance criteria checkboxes.';
+    return `## Spec Template: ${template.name}\n\n${template.content}`;
+  } catch (err) {
+    return handleError(err);
+  }
+}
+
+// ============================================================
 // Helpers
 // ============================================================
 

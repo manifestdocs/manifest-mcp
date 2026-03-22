@@ -1,0 +1,23 @@
+name = "manifest-mcp"
+main = "src/worker.ts"
+compatibility_date = "2026-03-22"
+
+routes = [
+  { pattern = "mcp.manifestdocs.ai", custom_domain = true },
+]
+
+[vars]
+MANIFEST_API_BASE_URL = "https://api.manifestdocs.ai"
+
+# Configure `WORKOS_AUTHKIT_DOMAIN` and optional `WORKOS_CLIENT_ID`
+# as Cloudflare Worker secrets/vars for each environment.
+
+[env.staging]
+name = "manifest-mcp-staging"
+workers_dev = true
+routes = [
+  { pattern = "mcp-staging.manifestdocs.ai", custom_domain = true },
+]
+
+[env.staging.vars]
+MANIFEST_API_BASE_URL = "https://api-staging.manifestdocs.ai"

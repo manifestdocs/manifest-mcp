@@ -168,6 +168,15 @@ export class ManifestClient {
     return this.request('GET', `/projects/${id}`);
   }
 
+  async getProjectTemplate(projectId: string): Promise<{ name: string; content: string } | null> {
+    try {
+      return await this.request('GET', `/projects/${projectId}/template`);
+    } catch (err) {
+      if (err instanceof NotFoundError) return null;
+      throw err;
+    }
+  }
+
   async initProject(input: {
     directory_path: string;
     skip_default_versions?: boolean;

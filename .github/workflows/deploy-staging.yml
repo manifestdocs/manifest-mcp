@@ -1,0 +1,42 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run check
+
+      - name: Run tests
+        run: bun run test:run
+
+      - name: Deploy to staging
+        run: npx wrangler deploy --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -sfI https://mcp-staging.manifestdocs.ai/ | grep -qi 'www-authenticate'
+          echo "Staging MCP challenge check passed"

@@ -31,15 +31,16 @@ describe('MCP Server', () => {
     return { server, client };
   }
 
-  it('registers all 25 tools', async () => {
+  it('registers all 26 tools', async () => {
     const { client } = await createConnectedPair();
     const { tools } = await client.listTools();
-    expect(tools.length).toBe(25);
+    expect(tools.length).toBe(26);
 
     const names = tools.map((t) => t.name).sort();
     expect(names).toContain('list_projects');
     expect(names).toContain('find_features');
     expect(names).toContain('get_feature');
+    expect(names).toContain('get_template');
 
     expect(names).toContain('get_next_feature');
     expect(names).toContain('render_feature_tree');

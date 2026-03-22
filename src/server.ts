@@ -11,7 +11,7 @@ import {
   handleListProjects,
   handleFindFeatures,
   handleGetFeature,
-
+  handleGetTemplate,
   handleGetNextFeature,
   handleRenderFeatureTree,
   handleOrient,
@@ -44,6 +44,7 @@ import {
   handleGetFeatureProof,
 } from './tools/verification.js';
 import type { ProposedFeature } from './types.js';
+import { MANIFEST_INSTRUCTIONS } from './generated/instructions.js';
 
 function textResult(text: string) {
   return { content: [{ type: 'text' as const, text }] };
@@ -63,38 +64,12 @@ const SeverityEnum = z.enum(['critical', 'major', 'minor']);
 const ProposedFeatureSchema: z.ZodType<ProposedFeature> = z.lazy(() =>
   z.object({
     title: z.string().describe('Feature capability name'),
-    details: z.string().optional().describe('Spec or shared context'),
+    details: z.string().optional().describe('Leaf: user story + context + acceptance criteria checkboxes (see Spec Format). Parent: shared architectural context.'),
     priority: z.number().describe('Priority (lower = first)'),
     state: FeatureStateEnum.optional().describe("Initial state. Default 'proposed'."),
     children: z.array(ProposedFeatureSchema),
   }) as z.ZodType<ProposedFeature>,
 );
-
-// ============================================================
-// Server Instructions
-// ============================================================
-
-const MANIFEST_INSTRUCTIONS = `Manifest tracks features (system capabilities), not tasks. Features are living documentation that evolves with the codebase.
-
-## Session Start
-Always call orient with directory_path to discover the project and its current state.
-
-## Bootstrap Protocol (orient reports empty project)
-1. Gather input: read a PRD, ask the user to describe capabilities, or analyze the codebase yourself
-2. Analyze: decompose the input into a tree of capabilities (not tasks or phases)
-3. Preview: call decompose with confirm=false to review the proposed tree
-4. Confirm: call decompose with confirm=true to create the features
-5. Root context: call update_feature on the root to set details (project overview, tech stack, conventions)
-6. Versions: call create_version for initial milestones, then set_feature_version to assign features
-
-## Work Protocol
-get_next_feature -> start_feature -> assess_plan -> implement -> prove_feature -> update_feature (spec) -> complete_feature
-
-## Conventions
-- Features describe capabilities ("Image upload"), not tasks ("Set up S3 bucket")
-- Parent features hold shared context in details; leaf features are implementable units
-- All features should be assigned to a version
-- Proof (test evidence) is required before completing a feature`;
 
 // ============================================================
 // createServer
@@ -109,7 +84,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
   );
 
   // ----------------------------------------------------------
-  // Discovery Tools (7)
+  // Discovery Tools (8)
   // ----------------------------------------------------------
 
   server.tool(
@@ -177,6 +152,15 @@ export function createServer(config?: ManifestClientConfig): McpServer {
       directory_path: z.string().optional().describe('Directory path to auto-discover project'),
     },
     async (params) => textResult(await handleOrient(client, params)),
+  );
+
+  server.tool(
+    'get_template',
+    "Get the project's spec template for writing feature details. Fetch before writing specs in decompose or update_feature.",
+    {
+      project_id: z.string().describe('Project UUID'),
+    },
+    async (params) => textResult(await handleGetTemplate(client, params)),
   );
 
   // ----------------------------------------------------------
@@ -306,12 +290,12 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'create_feature',
-    'Create a single feature describing a system CAPABILITY (what users can do), not an implementation task. Features are living documentation — they should make sense long after the code is written. Good: "Image upload", "Email notifications". Bad: "Set up S3 bucket", "Phase 2: Add endpoint". Check find_features for duplicates first.',
+    'Create a single feature describing a system CAPABILITY (what users can do), not an implementation task. Features are living documentation — they should make sense long after the code is written. Good: "Image upload", "Email notifications". Bad: "Set up S3 bucket", "Phase 2: Add endpoint". Leaf feature details must follow the Spec Format (user story + context + acceptance criteria checkboxes). Check find_features for duplicates first.',
     {
       project_id: z.string().describe('Project UUID'),
       parent_id: z.string().optional().describe('Parent feature UUID'),
       title: z.string().describe('Short capability name (2-5 words)'),
-      details: z.string().optional().describe('Feature spec or shared context'),
+      details: z.string().optional().describe('Leaf: user story + context + acceptance criteria checkboxes (see Spec Format). Parent: shared architectural context.'),
       state: FeatureStateEnum.optional().describe("Initial state. Default 'proposed'."),
       priority: z.number().optional().describe('Priority (lower = first). Default 0.'),
     },
@@ -329,7 +313,7 @@ export function createServer(config?: ManifestClientConfig): McpServer {
 
   server.tool(
     'decompose',
-    'Decompose a PRD or vision into a feature tree of CAPABILITIES, not implementation phases or tasks. Each feature should describe what users can do, not how to build it. Use confirm=false to preview, confirm=true to create.',
+    'Decompose a PRD or vision into a feature tree of CAPABILITIES, not implementation phases or tasks. Each feature should describe what users can do, not how to build it. Leaf feature details (50-150 words) must follow the Spec Format: user story + brief context + acceptance criteria checkboxes (3-5 items). Parent details hold shared architectural context. For existing codebases, set state to "implemented" and check off criteria with [x]. Use confirm=false to preview, confirm=true to create.',
     {
       project_id: z.string().describe('Project UUID'),
       features: z.array(ProposedFeatureSchema).describe('Proposed feature tree'),

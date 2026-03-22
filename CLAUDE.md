@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Overview
 
-`@manifestdocs/mcp` is a standalone MCP server that exposes 27 Manifest tools over stdio JSON-RPC 2.0. It is spawned by Claude Code or Cursor as a child process.
+`@manifestdocs/mcp` is a standalone MCP server that exposes 27 Manifest tools. It supports a stdio entry point for local agents and a Cloudflare Worker HTTP transport for the hosted MCP subdomain.
 
 ## Build & Test
 
@@ -19,6 +19,8 @@ pnpm check                      # Type-check without emitting
 ## Architecture
 
 - **`src/index.ts`** — CLI entry point: creates server, connects stdio transport
+- **`src/http.ts`** — HTTP Worker adapter: WorkOS/AuthKit challenge flow + MCP streamable HTTP
+- **`src/worker.ts`** — Cloudflare Worker entry point
 - **`src/server.ts`** — `createServer()`: registers 27 tools with zod schemas, delegates to handlers
 - **`src/types.ts`** — Domain types (copied from manifest-pi, zero dependencies)
 - **`src/client.ts`** — HTTP client wrapping fetch() with typed methods
@@ -37,6 +39,8 @@ pnpm check                      # Type-check without emitting
 Environment variables:
 - `MANIFEST_URL` — Server URL (default: `http://localhost:4242`)
 - `MANIFEST_API_KEY` — Optional API key for authenticated servers
+- `MANIFEST_API_BASE_URL` — Hosted MCP Worker target API base URL
+- `WORKOS_AUTHKIT_DOMAIN` — AuthKit issuer/domain for hosted MCP auth
 
 ## Claude Code Integration
 

@@ -17,18 +17,24 @@
     "package.json"
   ],
   "scripts": {
-    "build": "tsc",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "check": "tsc --noEmit"
+    "generate:content": "node ./scripts/generate-content.mjs",
+    "build": "node ./scripts/generate-content.mjs && tsc",
+    "test": "node ./scripts/generate-content.mjs && vitest",
+    "test:run": "node ./scripts/generate-content.mjs && vitest run",
+    "check": "node ./scripts/generate-content.mjs && tsc --noEmit",
+    "dev:workers": "wrangler dev",
+    "deploy:workers": "wrangler deploy"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
+    "jose": "^6.2.2",
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260317.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "wrangler": "^4.76.0"
   }
 }
