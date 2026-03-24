@@ -109,7 +109,10 @@ describe('MCP HTTP worker', () => {
     });
     const request = new Request('https://mcp.manifestdocs.ai/', {
       method: 'POST',
-      headers: { authorization: 'Bearer user-token' },
+      headers: {
+        authorization: 'Bearer user-token',
+        'x-manifest-request-id': 'req_123',
+      },
       body: JSON.stringify({ jsonrpc: '2.0', id: '1', method: 'initialize', params: {} }),
     });
 
@@ -118,12 +121,17 @@ describe('MCP HTTP worker', () => {
     expect(res.status).toBe(200);
     expect(createServer).toHaveBeenCalledWith({
       baseUrl: 'https://api.manifestdocs.ai',
-      apiKey: 'user-token',
+      accessToken: 'user-token',
+      defaultHeaders: {
+        'X-Manifest-Client': 'mcp-cloud',
+        'X-Manifest-Request-Id': 'req_123',
+      },
     });
     expect(server.connect).toHaveBeenCalledWith(transport);
     expect(transport.handleRequest).toHaveBeenCalledWith(request);
     expect(transport.close).toHaveBeenCalledOnce();
     expect(server.close).toHaveBeenCalledOnce();
+    expect(res.headers.get('x-manifest-request-id')).toBe('req_123');
   });
 
   it('returns 404 for unknown paths', async () => {

@@ -12,6 +12,7 @@ import { createServer } from './server.js';
 
 const server = createServer({
   baseUrl: process.env.MANIFEST_URL ?? 'http://localhost:4242',
+  accessToken: process.env.MANIFEST_ACCESS_TOKEN,
   apiKey: process.env.MANIFEST_API_KEY,
 });
 

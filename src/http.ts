@@ -162,6 +162,16 @@ function unauthorizedResponse(request: Request, error: UnauthorizedError): Respo
   );
 }
 
+function withRequestId(response: Response, requestId: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set('X-Manifest-Request-Id', requestId);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 export function createMcpWorker(overrides: Partial<WorkerDependencies> = {}) {
   const deps: WorkerDependencies = {
     createServer,
@@ -229,10 +239,15 @@ export function createMcpWorker(overrides: Partial<WorkerDependencies> = {}) {
         }
         throw error;
       }
+      const requestId = request.headers.get('x-manifest-request-id')?.trim() || crypto.randomUUID();
 
       const server = deps.createServer({
         baseUrl: apiBaseUrl,
-        apiKey: bearerToken,
+        accessToken: bearerToken,
+        defaultHeaders: {
+          'X-Manifest-Client': 'mcp-cloud',
+          'X-Manifest-Request-Id': requestId,
+        },
       });
       const transport = deps.createTransport();
       const closeAsync = () => {
@@ -243,7 +258,7 @@ export function createMcpWorker(overrides: Partial<WorkerDependencies> = {}) {
         await server.connect(transport);
         const response = await transport.handleRequest(request);
         closeAsync();
-        return response;
+        return withRequestId(response, requestId);
       } catch (error) {
         await Promise.allSettled([transport.close(), server.close()]);
         throw error;

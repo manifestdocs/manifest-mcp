@@ -38,7 +38,8 @@ pnpm check                      # Type-check without emitting
 
 Environment variables:
 - `MANIFEST_URL` — Server URL (default: `http://localhost:4242`)
-- `MANIFEST_API_KEY` — Optional API key for authenticated servers
+- `MANIFEST_ACCESS_TOKEN` — Preferred bearer token for authenticated cloud calls
+- `MANIFEST_API_KEY` — Optional localhost API key for local dev servers
 - `MANIFEST_API_BASE_URL` — Hosted MCP Worker target API base URL
 - `WORKOS_AUTHKIT_DOMAIN` — AuthKit issuer/domain for hosted MCP auth
 
