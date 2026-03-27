@@ -43,6 +43,10 @@ import {
   handleRecordVerification,
   handleGetFeatureProof,
 } from './tools/verification.js';
+import {
+  handlePlanTeam,
+  handleGetSpawnContext,
+} from './tools/teams.js';
 import type { ProposedFeature } from './types.js';
 import { MANIFEST_INSTRUCTIONS } from './generated/instructions.js';
 
@@ -422,6 +426,33 @@ export function createServer(config?: ManifestClientConfig): McpServer {
       feature_id: z.string().describe('Feature UUID or display ID'),
     },
     async (params) => textResult(await handleGetFeatureProof(client, params)),
+  );
+
+  // ----------------------------------------------------------
+  // Team Tools (2)
+  // ----------------------------------------------------------
+
+  server.tool(
+    'plan_team',
+    'Analyze the feature tree and recommend an Agent Team structure. Two scopes: pass version_id to plan across modules (teammates own different feature sets), or pass feature_id to plan within a feature set (teammates own different leaves). Recommends team size (5-6 features per teammate) and assigns features to avoid file conflicts.',
+    {
+      project_id: z.string().optional().describe('Project UUID'),
+      directory_path: z.string().optional().describe('Directory path for auto-discovery (alternative to project_id)'),
+      feature_id: z.string().optional().describe('Parent feature UUID or display ID for feature set scope (plan within one module)'),
+      version_id: z.string().optional().describe('Version UUID for version scope (plan across modules, default: next unreleased)'),
+      max_teammates: z.number().optional().describe('Maximum teammates (default 5, max 8)'),
+    },
+    async (params) => textResult(await handlePlanTeam(client, params)),
+  );
+
+  server.tool(
+    'get_spawn_context',
+    'Generate a self-contained spawn prompt for an Agent Team teammate. Includes feature specs, acceptance criteria, breadcrumb context, and project directories. Teammates do not inherit conversation history, so this provides everything they need.',
+    {
+      feature_ids: z.array(z.string()).min(1).max(6).describe('Feature UUIDs or display IDs to include (1-6)'),
+      include_project_context: z.boolean().optional().describe('Include project directories and instructions (default true)'),
+    },
+    async (params) => textResult(await handleGetSpawnContext(client, params)),
   );
 
   return server;
